@@ -183,8 +183,9 @@ func teamMembers(org, team string) ([]string, error) {
 // prFields is the per-PR selection, shared by every search alias.
 const prFields = `
     number title url isDraft createdAt updatedAt
+    baseRefName headRefName isCrossRepository
     author { login }
-    repository { nameWithOwner }
+    repository { nameWithOwner defaultBranchRef { name } }
     reviewDecision
     additions deletions
     commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }`
@@ -274,12 +275,16 @@ type node struct {
 	UpdatedAt  time.Time               `json:"updatedAt"`
 	Author     *struct{ Login string } `json:"author"`
 	Repository struct {
-		NameWithOwner string `json:"nameWithOwner"`
+		NameWithOwner    string                 `json:"nameWithOwner"`
+		DefaultBranchRef *struct{ Name string } `json:"defaultBranchRef"`
 	} `json:"repository"`
-	ReviewDecision string `json:"reviewDecision"`
-	Additions      int    `json:"additions"`
-	Deletions      int    `json:"deletions"`
-	Commits        struct {
+	BaseRefName       string `json:"baseRefName"`
+	HeadRefName       string `json:"headRefName"`
+	IsCrossRepository bool   `json:"isCrossRepository"`
+	ReviewDecision    string `json:"reviewDecision"`
+	Additions         int    `json:"additions"`
+	Deletions         int    `json:"deletions"`
+	Commits           struct {
 		Nodes []struct {
 			Commit struct {
 				StatusCheckRollup *struct{ State string } `json:"statusCheckRollup"`
@@ -300,11 +305,18 @@ func (n node) toPR() PR {
 		ReviewDecision: n.ReviewDecision,
 		Additions:      n.Additions,
 		Deletions:      n.Deletions,
+		Base:           n.BaseRefName,
+		Head:           n.HeadRefName,
+		CrossRepo:      n.IsCrossRepository,
 	}
-	// A deleted account leaves author null, and a repo with no CI leaves the
-	// rollup null. Both are normal, so neither may panic.
+	// A deleted account leaves author null, a repo with no CI leaves the rollup
+	// null, and an empty repo has no default branch. All are normal, so none may
+	// panic.
 	if n.Author != nil {
 		p.Author = n.Author.Login
+	}
+	if n.Repository.DefaultBranchRef != nil {
+		p.DefaultBranch = n.Repository.DefaultBranchRef.Name
 	}
 	if c := n.Commits.Nodes; len(c) > 0 && c[0].Commit.StatusCheckRollup != nil {
 		p.Checks = c[0].Commit.StatusCheckRollup.State
@@ -361,7 +373,9 @@ func (r response) merge() []PR {
 		}
 		return cmp.Compare(a.Number, b.Number)
 	})
-	return prs
+	// Stacking runs on the merged list rather than per search, because a stack
+	// can span them: yours stacked on a teammate's.
+	return stack(prs)
 }
 
 // --- process ----------------------------------------------------------------

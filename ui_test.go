@@ -507,3 +507,119 @@ func TestNotesSummariseWhatNeedsDoing(t *testing.T) {
 		t.Errorf("teamNote() with none for you = %q", got)
 	}
 }
+
+// lineFor finds the drawn row for a PR number. Numbers are right-aligned in a
+// five-column field, so " 1402 " cannot match inside a longer number.
+func lineFor(t *testing.T, view string, number int) string {
+	t.Helper()
+	needle := fmt.Sprintf(" %d ", number)
+	for line := range strings.SplitSeq(view, "\n") {
+		if strings.Contains(line, needle) {
+			return line
+		}
+	}
+	t.Fatalf("no row for #%d in:\n%s", number, view)
+	return ""
+}
+
+func stackedModel(width int) model {
+	prs := stack([]PR{
+		branch(1567, 22, "honor-status", "revoke-tokens"),
+		branch(1565, 23, "provenance", "honor-status"),
+		branch(1562, 24, "main", "rasterize"),
+		branch(1507, 400, "accept-logins", "provenance"),
+		branch(1402, 1200, "main", "accept-logins"),
+	})
+	for i := range prs {
+		prs[i].Mine = true
+		prs[i].Title = "title"
+	}
+	m := model{client: &Client{}, prs: prs, loaded: true, width: width}
+	m.ensureSelection()
+	return m
+}
+
+// The connector sits between the number and the title, in a column every row
+// reserves, so stacked and unstacked titles still line up.
+func TestStackConnectorsDrawTheChain(t *testing.T) {
+	for _, width := range []int{50, 100} {
+		view := stackedModel(width).View()
+		for number, want := range map[int]string{
+			1567: "1567 ┌ title",
+			1565: "1565 │ title",
+			1507: "1507 │ title",
+			1402: "1402 └ title",
+			1562: "1562   title",
+		} {
+			if line := lineFor(t, view, number); !strings.Contains(line, want) {
+				t.Errorf("width %d: #%d row = %q, want it to contain %q",
+					width, number, line, want)
+			}
+		}
+	}
+}
+
+// Connectors come from the neighbouring rows, not from the stack alone. A stack
+// split between MINE and TEAM must not leave a line pointing at nothing.
+func TestStackConnectorsDoNotDangleAcrossSections(t *testing.T) {
+	prs := stack([]PR{
+		branch(42, 1, "theirs", "mine"),
+		branch(41, 2, "main", "theirs"),
+	})
+	prs[0].Mine, prs[0].Title = true, "title"
+	prs[1].Author, prs[1].Title = "teammate", "title"
+
+	m := model{client: &Client{}, prs: prs, loaded: true, width: 100}
+	m.ensureSelection()
+	view := m.View()
+	for _, number := range []int{41, 42} {
+		want := fmt.Sprintf("%d   title", number)
+		if line := lineFor(t, view, number); !strings.Contains(line, want) {
+			t.Errorf("#%d row = %q, want no connector", number, line)
+		}
+	}
+}
+
+// Where a PR sits in its stack goes on the detail line, ahead of the idle time,
+// since it is what explains the connector.
+func TestDetailSaysWhereAPRSitsInItsStack(t *testing.T) {
+	prs := stackedModel(100).prs
+	l := layoutFor(100)
+
+	if got := detailOf(byNumber(prs, 1507), l, 100); !strings.HasPrefix(got, "2 of 4 · on #1402") {
+		t.Errorf("middle of a stack: detail = %q", got)
+	}
+	// The bottom has nothing loaded under it, but is still part of a stack.
+	if got := detailOf(byNumber(prs, 1402), l, 100); !strings.HasPrefix(got, "1 of 4 ·") ||
+		strings.Contains(got, "on ") {
+		t.Errorf("bottom of a stack: detail = %q", got)
+	}
+	if got := detailOf(byNumber(prs, 1562), l, 100); strings.Contains(got, " of ") {
+		t.Errorf("unstacked PR claimed a stack position: %q", got)
+	}
+}
+
+// A parent outside the feed still means the PR does not target main, and
+// letting it read as though it did is the mistake that merges into the wrong
+// branch.
+func TestDetailNamesAnUnloadedBase(t *testing.T) {
+	p := stack([]PR{branch(5, 1, "someone-elses-branch", "mine")})[0]
+	if got := detailOf(p, layoutFor(100), 100); !strings.HasPrefix(got, "on someone-elses-branch") {
+		t.Errorf("detail = %q, want it to name the base", got)
+	}
+}
+
+func TestStackedRowsFitTheirWidth(t *testing.T) {
+	for _, width := range []int{30, 40, 46, 60, 75, 76, 80, 100, 140} {
+		m := stackedModel(width)
+		for i := range m.prs {
+			m.prs[i].Title = strings.Repeat("a long pull request title ", 6)
+		}
+		l := layoutFor(width)
+		for _, r := range m.rows(l, width) {
+			if got := lipgloss.Width(m.render(r, width, l)); got > width {
+				t.Errorf("width %d: unclipped row is %d columns", width, got)
+			}
+		}
+	}
+}

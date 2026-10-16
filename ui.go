@@ -389,6 +389,10 @@ const (
 	stateWidth  = 17 // "changes requested", the longest label
 	authorWidth = 12
 	numWidth    = 5
+	// linkWidth is the stack connector and the gap after it. Every row reserves
+	// it, stacked or not, so titles stay aligned and do not shift when a stack
+	// appears or merges away.
+	linkWidth = 2
 	// rowIndent nests PR rows one column under their repo group, leaving the
 	// cursor out at the margin where it stays easy to find.
 	rowIndent = 1
@@ -405,17 +409,18 @@ type layout struct {
 
 func layoutFor(width int) layout {
 	if width < compactBelow {
-		// cursor(2) indent(1) glyph(1) gap(1) number(5) gap(1) title gap(1) age(4).
-		// The number gets five columns even though most repos never reach them:
-		// a six-figure PR in a big repo would push the age column past the edge
-		// and get clipped, and a clipped row is worse than a shorter title.
-		return layout{compact: true, title: max(width-16, 8)}
+		// cursor(2) indent(1) glyph(1) gap(1) number(5) gap(1) link(2) title
+		// gap(1) age(4). The number gets five columns even though most repos
+		// never reach them: a six-figure PR in a big repo would push the age
+		// column past the edge and get clipped, and a clipped row is worse than
+		// a shorter title.
+		return layout{compact: true, title: max(width-16-linkWidth, 8)}
 	}
 
 	// cursor(2) indent(1) index(1) gap(1) glyph(1) gap(1) number(5) gap(1)
-	// title gap(1) state(17) gap(1) age(4) gap(1) author(12)
-	fixed := 2 + rowIndent + 1 + 1 + 1 + 1 + numWidth + 1 + 1 + stateWidth +
-		1 + 4 + 1 + authorWidth
+	// link(2) title gap(1) state(17) gap(1) age(4) gap(1) author(12)
+	fixed := 2 + rowIndent + 1 + 1 + 1 + 1 + numWidth + 1 + linkWidth + 1 +
+		stateWidth + 1 + 4 + 1 + authorWidth
 	return layout{showAuthor: true, title: min(max(width-fixed, 16), 60)}
 }
 
@@ -445,6 +450,8 @@ type row struct {
 	note string
 	pr   PR
 	idx  int // 1-9 jump key, 0 for none
+	// link is the stack connector drawn between the number and the title.
+	link string
 	// crumb names the section and repo a PR row sits under, so a row scrolled
 	// away from its headers can still say where it belongs.
 	crumb string
@@ -477,9 +484,9 @@ func (m model) rows(l layout, width int) []row {
 				kind: rowGroup, text: g.repo, note: s.note(g.prs),
 			})
 			crumb := s.title + " · " + g.repo
-			for _, p := range g.prs {
+			for i, p := range g.prs {
 				jump++
-				r := row{kind: rowPR, pr: p, crumb: crumb}
+				r := row{kind: rowPR, pr: p, crumb: crumb, link: link(g.prs, i)}
 				if jump <= 9 {
 					r.idx = jump
 				}
@@ -498,6 +505,27 @@ func (m model) rows(l layout, width int) []row {
 		}
 	}
 	return rows
+}
+
+// link draws the stack connector for prs[i] from its neighbours rather than
+// from the stack alone. A stack split between MINE and TEAM leaves each half on
+// its own, and a connector pointing at a row in another section would point at
+// nothing.
+func link(prs []PR, i int) string {
+	same := func(j int) bool {
+		return j >= 0 && j < len(prs) && prs[i].StackRoot != "" &&
+			prs[j].StackRoot == prs[i].StackRoot
+	}
+	switch above, below := same(i-1), same(i+1); {
+	case above && below:
+		return "│"
+	case below:
+		return "┌"
+	case above:
+		return "└"
+	default:
+		return " "
+	}
 }
 
 type repoGroup struct {
@@ -569,11 +597,29 @@ func detailOf(p PR, l layout, width int) string {
 		// stating it once the group scrolls off.
 		parts = append(parts, p.State().Label)
 	}
+	parts = append(parts, stackOf(p)...)
 	if idle := p.Idle(); idle > 0 {
 		parts = append(parts, short(idle)+" idle")
 	}
 	parts = append(parts, fmt.Sprintf("+%d-%d", p.Additions, p.Deletions))
 	return fit(parts, " · ", width-len(detailIndent))
+}
+
+// stackOf says where a PR sits in its stack, which is what explains the
+// connector. A base that is not the default branch is worth saying even with no
+// loaded PR under it, or the row reads as though it targets main.
+func stackOf(p PR) []string {
+	var parts []string
+	if p.StackSize > 0 {
+		parts = append(parts, fmt.Sprintf("%d of %d", p.StackDepth, p.StackSize))
+	}
+	switch {
+	case p.StackOn > 0:
+		parts = append(parts, fmt.Sprintf("on #%d", p.StackOn))
+	case p.Base != "" && p.DefaultBranch != "" && p.Base != p.DefaultBranch:
+		parts = append(parts, "on "+p.Base)
+	}
+	return parts
 }
 
 // fit joins the leading parts that fit the width and drops the rest. A single
@@ -730,8 +776,8 @@ func (m model) render(r row, width int, l layout) string {
 
 	var body string
 	if l.compact {
-		body = fmt.Sprintf("%s %s %-*s %4s",
-			state.Glyph, num,
+		body = fmt.Sprintf("%s %s %s %-*s %4s",
+			state.Glyph, num, r.link,
 			title, truncate(p.Title, title),
 			short(p.Age()))
 	} else {
@@ -742,8 +788,8 @@ func (m model) render(r row, width int, l layout) string {
 		// No repo column: the group header above the row already says it, and
 		// spending fourteen columns to repeat it on every row is exactly what
 		// grouping is meant to save.
-		body = fmt.Sprintf("%s %s %s %-*s %-*s %4s",
-			dimStyle.Render(idx), state.Glyph, num,
+		body = fmt.Sprintf("%s %s %s %s %-*s %-*s %4s",
+			dimStyle.Render(idx), state.Glyph, num, r.link,
 			title, truncate(p.Title, title),
 			stateWidth, state.Label,
 			short(p.Age()))

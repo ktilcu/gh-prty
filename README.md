@@ -149,6 +149,37 @@ Grouping is only useful while you can see which group you are in, so a repo
 header that scrolls off the top is replaced by a breadcrumb — `MINE ·
 api` — rather than leaving the rows under it unattributable.
 
+## Stacks
+
+Stacked PRs are drawn as one run, tip first, with a connector between the number
+and the title:
+
+```
+  api                                                             4 ready
+   3 d  1567 ┌ Revoke user tokens when deactivating a user   draft        22h
+   4 d  1565 │ Honor customer user status on every login path    draft        23h
+   5 o  1507 │ Record which connection granted an access scope   awaiting r~  17d
+   6 o  1402 └ Accept logins from any connection             awaiting r~  52d
+   7 +  1539   Create new records instead of amendments             ready to m~   8d
+```
+
+A PR is stacked on another when its base branch is the other's head branch, in
+the same repo. That is the signal rather than the gh-stack footer, because a
+stack made by hand, or adopted with `gh stack link` after the fact, has no footer
+but always has the branches. A fork's head is never a parent: its branch names
+belong to the fork, and a fork PR from its own `main` would otherwise sit under
+every PR in the repo.
+
+A stack sits where its newest member would have, the same rule that ranks repo
+groups, so it still moves for nothing but `createdAt`. Under the cursor the
+detail line says where the PR sits — `2 of 4 · on #1402` — and names the base
+branch when the PR under it is not in the feed, so a PR never reads as targeting
+`main` when it does not.
+
+Connectors come from the neighbouring rows rather than the stack, so a stack split
+between MINE and TEAM — yours on a teammate's — draws each half on its own, and
+only the detail line ties them together.
+
 ## Narrow panes
 
 Under 76 columns the table switches to a compact layout, which is what a sidebar

@@ -28,6 +28,23 @@ type PR struct {
 	Additions int
 	Deletions int
 
+	// Base and Head are the branch names, which are all a stack is: a PR whose
+	// base is another open PR's head. CrossRepo marks a head on a fork, whose
+	// branch names say nothing about this repo's branches.
+	Base          string
+	Head          string
+	DefaultBranch string
+	CrossRepo     bool
+
+	// StackRoot is the key of the bottom PR of the stack this one is in, or ""
+	// when it is not stacked. The rest place it within that stack: StackOn is
+	// the PR directly under it (0 at the bottom), StackDepth counts up from 1 at
+	// the bottom, and StackSize is how many PRs the stack holds.
+	StackRoot  string
+	StackOn    int
+	StackDepth int
+	StackSize  int
+
 	// Mine is set for your own PRs, which changes what the state means: an
 	// approved PR of yours is a merge waiting to happen, an approved PR of
 	// someone else's is just done.

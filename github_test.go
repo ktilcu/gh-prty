@@ -166,3 +166,43 @@ func TestTransientOnlyRetriesGatewayErrors(t *testing.T) {
 type errString string
 
 func (e errString) Error() string { return string(e) }
+
+func TestToPRReadsBranches(t *testing.T) {
+	n := node1("org/app", 2, "2026-08-01T00:00:00Z")
+	n.BaseRefName, n.HeadRefName = "parent-branch", "child-branch"
+	n.IsCrossRepository = true
+	n.Repository.DefaultBranchRef = &struct{ Name string }{Name: "trunk"}
+
+	p := n.toPR()
+	if p.Base != "parent-branch" || p.Head != "child-branch" ||
+		p.DefaultBranch != "trunk" || !p.CrossRepo {
+		t.Errorf("got base %q head %q default %q cross %v",
+			p.Base, p.Head, p.DefaultBranch, p.CrossRepo)
+	}
+
+	// An empty repo has no default branch, and that must not panic either.
+	if p := node1("org/app", 3, "2026-08-01T00:00:00Z").toPR(); p.DefaultBranch != "" {
+		t.Errorf("default branch = %q, want empty", p.DefaultBranch)
+	}
+}
+
+// A stack can span sections — yours stacked on a teammate's — so stacking has
+// to happen on the merged list, not per search.
+func TestMergeLinksStacksAcrossSearches(t *testing.T) {
+	parent := node1("org/app", 1, "2026-08-01T00:00:00Z")
+	parent.BaseRefName, parent.HeadRefName = "main", "theirs"
+	child := node1("org/app", 2, "2026-08-02T00:00:00Z")
+	child.BaseRefName, child.HeadRefName = "theirs", "mine"
+	for _, n := range []*node{&parent, &child} {
+		n.Repository.DefaultBranchRef = &struct{ Name string }{Name: "main"}
+	}
+
+	var r response
+	r.Data.Mine.Nodes = []node{child}
+	r.Data.Team.Nodes = []node{parent}
+
+	prs := r.merge()
+	if len(prs) != 2 || prs[0].Number != 2 || prs[0].StackOn != 1 {
+		t.Errorf("merge did not stack #2 on #1: %+v", prs)
+	}
+}

@@ -507,14 +507,14 @@ func firstLine(s string) string {
 	return ""
 }
 
-// openURL and copyURL are the two things worth doing to a selected row, and both
+// openURL and copyText are the two things worth doing to a selected row, and both
 // are fire-and-forget: the UI reports failure but never waits on either.
 func openURL(url string) error {
 	return exec.Command("open", url).Run()
 }
 
-func copyURL(url string) error {
+func copyText(text string) error {
 	cmd := exec.Command("pbcopy")
-	cmd.Stdin = strings.NewReader(url)
+	cmd.Stdin = strings.NewReader(text)
 	return cmd.Run()
 }

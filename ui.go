@@ -135,12 +135,12 @@ func openCmd(p PR) tea.Cmd {
 	}
 }
 
-func copyCmd(p PR) tea.Cmd {
+func copyCmd(text, note string) tea.Cmd {
 	return func() tea.Msg {
-		if err := copyURL(p.URL); err != nil {
+		if err := copyText(text); err != nil {
 			return actionMsg{err: err}
 		}
-		return actionMsg{note: "copied " + p.URL}
+		return actionMsg{note: note}
 	}
 }
 
@@ -228,7 +228,13 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.message = "nothing selected"
 	case "y":
 		if p, ok := m.current(); ok {
-			return m, copyCmd(p)
+			return m, copyCmd(p.URL, "copied "+p.URL)
+		}
+		m.message = "nothing selected"
+	case "Y":
+		// Title over link, ready to paste into a chat message.
+		if p, ok := m.current(); ok {
+			return m, copyCmd(p.Title+"\n"+p.URL, "copied title and url")
 		}
 		m.message = "nothing selected"
 	case "tab":
@@ -784,6 +790,7 @@ var helpKeys = [][2]string{
 	{"j k", "move"},
 	{"enter o", "open in browser"},
 	{"y", "copy url"},
+	{"Y", "copy title and url"},
 	{"1-9", "select and open"},
 	{"tab", "all, mine, team"},
 	{"g G", "first, last"},

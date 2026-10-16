@@ -107,6 +107,7 @@ terminals without truecolor.
 | `j` `k` / arrows | move the cursor |
 | `enter` / `o` | open the selected PR in your browser |
 | `y` | copy the selected PR's URL |
+| `Y` | copy the selected PR's title and URL, on two lines |
 | `1`-`9` | select and open in one keystroke |
 | `tab` | cycle all → mine → team |
 | `g` `G` | first, last |
@@ -328,4 +329,4 @@ terminal.
 ## Requirements
 
 Go 1.26+ to build from source, and `gh` logged in. `enter` uses `open` and `y`
-uses `pbcopy`, so those two keys are macOS-only; everything else is portable.
+and `Y` use `pbcopy`, so those keys are macOS-only; everything else is portable.

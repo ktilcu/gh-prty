@@ -45,6 +45,15 @@ type PR struct {
 	StackDepth int
 	StackSize  int
 
+	// Unresolved counts review threads nobody has resolved, Outdated how many
+	// of those sit on code that has since changed. Only fetched for your own
+	// PRs, so both are zero on everyone else's.
+	Unresolved int
+	Outdated   int
+	// Notes are the reviewers who approved with a written note. There is
+	// nothing to resolve, but the note may still be worth reading.
+	Notes []string
+
 	// Mine is set for your own PRs, which changes what the state means: an
 	// approved PR of yours is a merge waiting to happen, an approved PR of
 	// someone else's is just done.
@@ -85,6 +94,8 @@ const (
 	kindRunning
 	kindActOnIt // blocked on a human: you, or the author
 	kindBroken
+	kindApprovedOpen // approved, with threads still open: good news, not done
+	kindUnresolved   // threads open and no approval yet
 )
 
 var (
@@ -97,6 +108,20 @@ var (
 	stateRunning  = State{"~", "checks running", kindRunning}
 	stateWaiting  = State{"o", "awaiting review", kindNeutral}
 )
+
+// stateApprovedOpen and stateUnresolved carry their count in the label, since
+// how many threads are left is what says how close the PR is. Threads are
+// fetched a hundred at a time, so 99+ is as high as the label needs to go.
+func stateApprovedOpen(n int) State {
+	if n > 99 {
+		return State{"*", "approved · 99+", kindApprovedOpen}
+	}
+	return State{"*", fmt.Sprintf("approved · %d open", n), kindApprovedOpen}
+}
+
+func stateUnresolved(n int) State {
+	return State{"c", fmt.Sprintf("%d unresolved", n), kindUnresolved}
+}
 
 // State resolves the one thing to say about a PR. The order is a priority, not a
 // classification: a PR can be draft and failing and unreviewed at once, and the
@@ -114,12 +139,20 @@ func (p PR) State() State {
 	case p.Checks == "FAILURE" || p.Checks == "ERROR":
 		return stateFailing
 	case p.ReviewDecision == "APPROVED":
+		// Open threads mean the approval came with things to address, so it is
+		// not ready to merge until they are resolved.
+		if p.Unresolved > 0 {
+			return stateApprovedOpen(p.Unresolved)
+		}
 		// Approved is the finish line on your own PR and merely a fact on
 		// someone else's.
 		if p.Mine {
 			return stateReady
 		}
 		return stateApproved
+	// Checks finish on their own; open threads wait for you.
+	case p.Unresolved > 0:
+		return stateUnresolved(p.Unresolved)
 	case p.Checks == "PENDING" || p.Checks == "EXPECTED":
 		return stateRunning
 	default:

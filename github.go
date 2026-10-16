@@ -188,7 +188,14 @@ const prFields = `
     repository { nameWithOwner defaultBranchRef { name } }
     reviewDecision
     additions deletions
+    latestReviews(first: 10) { nodes { state body author { login } } }
     commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }`
+
+// threadFields is added to your own PRs only. Thread state has no count GitHub
+// can filter on, so every thread comes back, and asking for them on all four
+// searches would multiply the cost of a query that already 502s now and then.
+const threadFields = `
+    reviewThreads(first: 100) { nodes { isResolved isOutdated } }`
 
 // searchQuery builds one GraphQL request holding every search at once. Four
 // aliased searches cost a single HTTP round trip, which is what keeps the
@@ -199,17 +206,18 @@ const prFields = `
 // GitHub's own review-requested qualifiers can, and they clear themselves the
 // moment you submit a review.
 func searchQuery(org, team string, members []string, limit int) string {
-	searches := []struct{ alias, query string }{
-		{"mine", "author:@me"},
-		{"review", "review-requested:@me"},
+	type search struct{ alias, query, fields string }
+	searches := []search{
+		{"mine", "author:@me", prFields + threadFields},
+		{"review", "review-requested:@me", prFields},
 	}
 	if org != "" && team != "" {
-		searches = append(searches, struct{ alias, query string }{
-			"teamReview", fmt.Sprintf("team-review-requested:%s/%s", org, team),
+		searches = append(searches, search{
+			"teamReview", fmt.Sprintf("team-review-requested:%s/%s", org, team), prFields,
 		})
 	}
 	if q := teamScope(org, members); q != "" {
-		searches = append(searches, struct{ alias, query string }{"team", q})
+		searches = append(searches, search{"team", q, prFields})
 	}
 
 	var b strings.Builder
@@ -219,7 +227,7 @@ func searchQuery(org, team string, members []string, limit int) string {
     nodes { ... on PullRequest {%s
     } }
   }
-`, s.alias, s.query, limit, prFields)
+`, s.alias, s.query, limit, s.fields)
 	}
 	b.WriteString("}")
 	return b.String()
@@ -284,7 +292,20 @@ type node struct {
 	ReviewDecision    string `json:"reviewDecision"`
 	Additions         int    `json:"additions"`
 	Deletions         int    `json:"deletions"`
-	Commits           struct {
+	LatestReviews     struct {
+		Nodes []struct {
+			State  string                  `json:"state"`
+			Body   string                  `json:"body"`
+			Author *struct{ Login string } `json:"author"`
+		} `json:"nodes"`
+	} `json:"latestReviews"`
+	ReviewThreads struct {
+		Nodes []struct {
+			IsResolved bool `json:"isResolved"`
+			IsOutdated bool `json:"isOutdated"`
+		} `json:"nodes"`
+	} `json:"reviewThreads"`
+	Commits struct {
 		Nodes []struct {
 			Commit struct {
 				StatusCheckRollup *struct{ State string } `json:"statusCheckRollup"`
@@ -321,7 +342,41 @@ func (n node) toPR() PR {
 	if c := n.Commits.Nodes; len(c) > 0 && c[0].Commit.StatusCheckRollup != nil {
 		p.Checks = c[0].Commit.StatusCheckRollup.State
 	}
+	for _, t := range n.ReviewThreads.Nodes {
+		if t.IsResolved {
+			continue
+		}
+		p.Unresolved++
+		if t.IsOutdated {
+			p.Outdated++
+		}
+	}
+	for _, r := range n.LatestReviews.Nodes {
+		if r.State == "APPROVED" && strings.TrimSpace(r.Body) != "" && r.Author != nil {
+			p.Notes = append(p.Notes, r.Author.Login)
+		}
+	}
+	if p.ReviewDecision == "" {
+		p.ReviewDecision = n.decisionFromReviews()
+	}
 	return p
+}
+
+// decisionFromReviews stands in for reviewDecision on repos that require no
+// review, where GitHub leaves it empty even after an approval. GitHub's own
+// verdict wins whenever there is one: a repo needing two approvals says
+// REVIEW_REQUIRED after the first, and that is the truth.
+func (n node) decisionFromReviews() string {
+	decision := ""
+	for _, r := range n.LatestReviews.Nodes {
+		switch r.State {
+		case "CHANGES_REQUESTED":
+			return "CHANGES_REQUESTED"
+		case "APPROVED":
+			decision = "APPROVED"
+		}
+	}
+	return decision
 }
 
 // merge folds the four searches into one list. The searches overlap by design —

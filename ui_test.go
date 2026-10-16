@@ -495,6 +495,14 @@ func TestNotesSummariseWhatNeedsDoing(t *testing.T) {
 	if got := mineNote(mine); got != "1 ready · 1 blocked" {
 		t.Errorf("mineNote() = %q", got)
 	}
+	// Open threads are neither ready nor blocked: the work left is yours, and
+	// small.
+	withThreads := append(mine,
+		PR{Mine: true, ReviewDecision: "APPROVED", Unresolved: 1},
+		PR{Mine: true, Unresolved: 2})
+	if got := mineNote(withThreads); got != "1 ready · 2 to resolve · 1 blocked" {
+		t.Errorf("mineNote() with threads = %q", got)
+	}
 	// With nothing to act on, the count is the only useful thing to say.
 	if got := mineNote([]PR{{Mine: true}}); got != "1 open" {
 		t.Errorf("mineNote() with nothing pending = %q", got)
@@ -621,5 +629,25 @@ func TestStackedRowsFitTheirWidth(t *testing.T) {
 				t.Errorf("width %d: unclipped row is %d columns", width, got)
 			}
 		}
+	}
+}
+
+func TestDetailMentionsOutdatedThreadsAndNotes(t *testing.T) {
+	p := PR{Mine: true, ReviewDecision: "APPROVED", Unresolved: 2, Outdated: 1,
+		Notes: []string{"ann", "bob"}}
+	got := detailOf(p, layoutFor(100), 100)
+	for _, want := range []string{"1 outdated", "notes from ann, bob"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("detail = %q, missing %q", got, want)
+		}
+	}
+
+	one := PR{Mine: true, ReviewDecision: "APPROVED", Notes: []string{"ann"}}
+	if got := detailOf(one, layoutFor(100), 100); !strings.Contains(got, "note from ann") {
+		t.Errorf("detail = %q, want a note from ann", got)
+	}
+	if got := detailOf(PR{Mine: true}, layoutFor(100), 100); strings.Contains(got, "outdated") ||
+		strings.Contains(got, "note") {
+		t.Errorf("a PR with neither mentioned them: %q", got)
 	}
 }

@@ -27,6 +27,10 @@ var (
 	runningStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
 	actStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
 	brokenStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
+	// Approved with open threads is good news with a little left to do, so it
+	// gets a colour of its own rather than a shade of ready or blocked.
+	approvedOpenStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
+	unresolvedStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
 )
 
 func styleFor(k stateKind) lipgloss.Style {
@@ -39,6 +43,10 @@ func styleFor(k stateKind) lipgloss.Style {
 		return actStyle
 	case kindBroken:
 		return brokenStyle
+	case kindApprovedOpen:
+		return approvedOpenStyle
+	case kindUnresolved:
+		return unresolvedStyle
 	default:
 		return neutralStyle
 	}
@@ -386,7 +394,7 @@ const (
 	compactBelow = 76
 	// authorFrom is where there is room for an author column. Below it the
 	// author moves to the detail line under the cursor.
-	stateWidth  = 17 // "changes requested", the longest label
+	stateWidth  = 18 // "approved · 12 open", the longest label
 	authorWidth = 12
 	numWidth    = 5
 	// linkWidth is the stack connector and the gap after it. Every row reserves
@@ -418,7 +426,7 @@ func layoutFor(width int) layout {
 	}
 
 	// cursor(2) indent(1) index(1) gap(1) glyph(1) gap(1) number(5) gap(1)
-	// link(2) title gap(1) state(17) gap(1) age(4) gap(1) author(12)
+	// link(2) title gap(1) state(18) gap(1) age(4) gap(1) author(12)
 	fixed := 2 + rowIndent + 1 + 1 + 1 + 1 + numWidth + 1 + linkWidth + 1 +
 		stateWidth + 1 + 4 + 1 + authorWidth
 	return layout{showAuthor: true, title: min(max(width-fixed, 16), 60)}
@@ -598,6 +606,16 @@ func detailOf(p PR, l layout, width int) string {
 		parts = append(parts, p.State().Label)
 	}
 	parts = append(parts, stackOf(p)...)
+	if p.Outdated > 0 {
+		parts = append(parts, fmt.Sprintf("%d outdated", p.Outdated))
+	}
+	switch len(p.Notes) {
+	case 0:
+	case 1:
+		parts = append(parts, "note from "+p.Notes[0])
+	default:
+		parts = append(parts, "notes from "+strings.Join(p.Notes, ", "))
+	}
 	if idle := p.Idle(); idle > 0 {
 		parts = append(parts, short(idle)+" idle")
 	}
@@ -643,11 +661,13 @@ func fit(parts []string, sep string, width int) string {
 }
 
 func mineNote(prs []PR) string {
-	var ready, blocked int
+	var ready, resolve, blocked int
 	for _, p := range prs {
 		switch p.State().kind {
 		case kindGood:
 			ready++
+		case kindApprovedOpen, kindUnresolved:
+			resolve++
 		case kindActOnIt, kindBroken:
 			blocked++
 		}
@@ -656,6 +676,9 @@ func mineNote(prs []PR) string {
 	var parts []string
 	if ready > 0 {
 		parts = append(parts, fmt.Sprintf("%d ready", ready))
+	}
+	if resolve > 0 {
+		parts = append(parts, fmt.Sprintf("%d to resolve", resolve))
 	}
 	if blocked > 0 {
 		parts = append(parts, fmt.Sprintf("%d blocked", blocked))

@@ -66,3 +66,48 @@ func TestLookupThemeNamesTheChoicesOnAMiss(t *testing.T) {
 		}
 	}
 }
+
+// T walks every theme in the order the flag lists them and wraps around, so
+// pressing it len(themes) times comes back to where you started.
+func TestThemeKeyCyclesThroughEveryTheme(t *testing.T) {
+	defer useTheme(themes["default"])
+	useTheme(themes["default"])
+
+	m := model{client: &Client{}, loaded: true, width: 100, theme: "default"}
+	seen := map[string]bool{}
+	for range themes {
+		m, _ = press(m, "T")
+		if seen[m.theme] {
+			t.Fatalf("%s came round twice before every theme was shown", m.theme)
+		}
+		seen[m.theme] = true
+
+		// The styles must actually change, not just the name.
+		want := fmt.Sprint(themes[m.theme].approvedOpen)
+		if got := fmt.Sprint(styleFor(kindApprovedOpen).GetForeground()); got != want {
+			t.Errorf("on %s approved-open is %s, want %s", m.theme, got, want)
+		}
+	}
+	if m.theme != "default" {
+		t.Errorf("after a full cycle the theme is %s, want default", m.theme)
+	}
+}
+
+// Cycling is a preview and saves nothing, so it has to say how to keep the one
+// you land on.
+func TestThemeKeySaysHowToKeepIt(t *testing.T) {
+	defer useTheme(themes["default"])
+
+	m := model{client: &Client{}, loaded: true, width: 100, theme: "default"}
+	m, _ = press(m, "T")
+	if !strings.Contains(m.message, m.theme) || !strings.Contains(m.message, "--theme "+m.theme) {
+		t.Errorf("message = %q, want the theme and the flag that keeps it", m.message)
+	}
+}
+
+func TestHelpListsTheThemeKey(t *testing.T) {
+	view := model{client: &Client{}, help: true, width: 100}.View()
+	if !strings.Contains(view, "next theme") {
+		t.Error("help does not mention the theme key")
+	}
+}

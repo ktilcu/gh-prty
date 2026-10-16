@@ -89,6 +89,8 @@ type model struct {
 	// help swaps the list for the legend. It replaces the list rather than
 	// floating over it, because an overlay has nowhere to go in a sidebar.
 	help bool
+	// theme is the name of the theme in use, so T knows which comes next.
+	theme string
 
 	// loaded separates "fetched, found nothing" from "has not fetched yet", so
 	// startup does not flash an empty state that is not true.
@@ -205,6 +207,12 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "?":
 		m.help = true
+	case "T":
+		// A preview, not a setting: nothing is saved, so the message says how
+		// to keep the theme you land on.
+		m.theme = nextTheme(m.theme)
+		useTheme(themes[m.theme])
+		m.message = "theme: " + m.theme + " · --theme " + m.theme + " keeps it"
 	case "j", "down":
 		m.move(1)
 	case "k", "up":
@@ -780,6 +788,7 @@ var helpKeys = [][2]string{
 	{"tab", "all, mine, team"},
 	{"g G", "first, last"},
 	{"r", "refresh"},
+	{"T", "next theme"},
 	{"?", "this help"},
 	{"q", "quit"},
 }

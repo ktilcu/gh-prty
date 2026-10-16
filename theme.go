@@ -137,10 +137,21 @@ func (t theme) colours() map[string]lipgloss.Color {
 	}
 }
 
-// themeNames lists the themes for the flag's help and for errors, so neither
-// can fall out of step with the map.
+// themeOrder is the one order themes are listed and cycled in, so the flag's
+// help, the errors and the T key can never disagree.
+func themeOrder() []string {
+	return slices.Sorted(maps.Keys(themes))
+}
+
 func themeNames() string {
-	return strings.Join(slices.Sorted(maps.Keys(themes)), ", ")
+	return strings.Join(themeOrder(), ", ")
+}
+
+// nextTheme is the theme after name, wrapping at the end. An unknown name
+// starts from the top rather than failing, since T should always do something.
+func nextTheme(name string) string {
+	order := themeOrder()
+	return order[(slices.Index(order, name)+1)%len(order)]
 }
 
 func lookupTheme(name string) (theme, error) {
@@ -152,8 +163,10 @@ func lookupTheme(name string) (theme, error) {
 
 func init() { useTheme(themes["default"]) }
 
-// useTheme sets the package styles. It runs once, before the UI starts, which is
-// what makes package-level styles safe: nothing reads them while they change.
+// useTheme sets the package styles: once before the UI starts, and again each
+// time T cycles. Package-level styles are safe to swap because bubbletea runs
+// Update and View one after the other, never at once, so nothing is drawing
+// while they change.
 func useTheme(t theme) {
 	dimStyle = lipgloss.NewStyle().Foreground(t.dim)
 	cursorStyle = lipgloss.NewStyle().Foreground(t.cursor).Bold(true)

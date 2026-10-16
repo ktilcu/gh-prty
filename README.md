@@ -85,6 +85,7 @@ terminals without truecolor.
 | `tab` | cycle all → mine → team |
 | `g` `G` | first, last |
 | `r` | force a refresh |
+| `T` | cycle through the colour themes, to preview them; nothing is saved |
 | `?` | help: the legend and these keys; `?` or `esc` goes back |
 | `q` | quit |
 

@@ -55,6 +55,7 @@ func main() {
 	}
 
 	m := newModel(client, *every)
+	m.theme = *themeName
 
 	// --once needs no terminal, which makes it the mode for scripting, for cron,
 	// and for checking the render without taking over a pane.

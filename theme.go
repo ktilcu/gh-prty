@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -58,6 +59,72 @@ var themes = map[string]theme{
 		approvedOpen: "#c099ff", // magenta
 		unresolved:   "#ffc777", // yellow
 	},
+	// From catppuccin/palette, the mocha flavour.
+	"catppuccin-mocha": {
+		dim:    "#7f849c", // overlay1; overlay0 is too faint for text
+		cursor: "#a6e3a1", // green
+		err:    "#f38ba8", // red
+		header: "#89b4fa", // blue
+		group:  "#b4befe", // lavender
+
+		neutral:      "#cdd6f4", // text
+		good:         "#a6e3a1", // green
+		running:      "#89dceb", // sky
+		act:          "#fab387", // peach
+		broken:       "#f38ba8", // red
+		approvedOpen: "#cba6f7", // mauve
+		unresolved:   "#f9e2af", // yellow
+	},
+	// From morhetz/gruvbox, the bright accents meant for a dark background.
+	"gruvbox-dark": {
+		dim:    "#928374", // gray
+		cursor: "#b8bb26", // bright green
+		err:    "#fb4934", // bright red
+		header: "#83a598", // bright blue
+		group:  "#8ec07c", // bright aqua
+
+		neutral:      "#ebdbb2", // light1
+		good:         "#b8bb26", // bright green
+		running:      "#83a598", // bright blue
+		act:          "#fe8019", // bright orange
+		broken:       "#fb4934", // bright red
+		approvedOpen: "#d3869b", // bright purple
+		unresolved:   "#fabd2f", // bright yellow
+	},
+	// Classic Monokai, as Sublime Text shipped it. It has no plain red; its
+	// pink is what it uses for errors, so that is what failing gets.
+	"monokai": {
+		dim:    "#75715e", // comment
+		cursor: "#a6e22e", // green
+		err:    "#f92672", // pink
+		header: "#f8f8f2", // foreground; its one blue is spent on running
+		group:  "#66d9ef", // cyan
+
+		neutral:      "#f8f8f2", // foreground
+		good:         "#a6e22e", // green
+		running:      "#66d9ef", // cyan
+		act:          "#fd971f", // orange
+		broken:       "#f92672", // pink
+		approvedOpen: "#ae81ff", // purple
+		unresolved:   "#e6db74", // yellow
+	},
+	// Ethan Schoonover's Solarized, light. Text is base00 on base3 as the
+	// palette intends; secondary content is base1.
+	"solarized-light": {
+		dim:    "#93a1a1", // base1
+		cursor: "#859900", // green
+		err:    "#dc322f", // red
+		header: "#268bd2", // blue
+		group:  "#586e75", // base01, the emphasised tone
+
+		neutral:      "#657b83", // base00
+		good:         "#859900", // green
+		running:      "#2aa198", // cyan
+		act:          "#cb4b16", // orange
+		broken:       "#dc322f", // red
+		approvedOpen: "#6c71c4", // violet
+		unresolved:   "#b58900", // yellow
+	},
 }
 
 // colours names every role, so a test can check that no theme leaves one out.
@@ -70,17 +137,17 @@ func (t theme) colours() map[string]lipgloss.Color {
 	}
 }
 
+// themeNames lists the themes for the flag's help and for errors, so neither
+// can fall out of step with the map.
+func themeNames() string {
+	return strings.Join(slices.Sorted(maps.Keys(themes)), ", ")
+}
+
 func lookupTheme(name string) (theme, error) {
 	if t, ok := themes[name]; ok {
 		return t, nil
 	}
-	names := make([]string, 0, len(themes))
-	for n := range themes {
-		names = append(names, n)
-	}
-	slices.Sort(names)
-	return theme{}, fmt.Errorf("unknown theme %q; choose from %s", name,
-		strings.Join(names, ", "))
+	return theme{}, fmt.Errorf("unknown theme %q; choose from %s", name, themeNames())
 }
 
 func init() { useTheme(themes["default"]) }

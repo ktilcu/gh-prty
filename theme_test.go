@@ -59,7 +59,8 @@ func TestLookupThemeNamesTheChoicesOnAMiss(t *testing.T) {
 	if err == nil {
 		t.Fatal("unknown theme was accepted")
 	}
-	for _, name := range []string{"default", "tokyonight-moon"} {
+	for _, name := range []string{"catppuccin-mocha", "default", "gruvbox-dark",
+		"monokai", "solarized-light", "tokyonight-moon"} {
 		if !strings.Contains(err.Error(), name) {
 			t.Errorf("error %q does not offer %s", err, name)
 		}

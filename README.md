@@ -68,7 +68,7 @@ Then run `prty` in a pane and leave it there. It needs `gh` on PATH and logged i
 | `--every` | how often to refresh (default `1m`) |
 | `--once` | print one frame and exit; needs no terminal, so it works in scripts and cron |
 | `--width` | render `--once` at a given width, for previewing the narrow layout |
-| `--theme` | colour scheme: `default` or `tokyonight-moon` |
+| `--theme` | colour scheme: `default`, `catppuccin-mocha`, `gruvbox-dark`, `monokai`, `solarized-light` or `tokyonight-moon` |
 
 Themes set foreground colours only. The background stays your terminal's, so a
 theme pairs best with the matching terminal profile. Hex colours scale down on

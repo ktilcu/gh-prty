@@ -94,8 +94,8 @@ func TestStatePriority(t *testing.T) {
 func TestRepoName(t *testing.T) {
 	for in, want := range map[string]string{
 		"acme/api": "api",
-		"no-slash":                     "no-slash",
-		"":                             "",
+		"no-slash": "no-slash",
+		"":         "",
 	} {
 		if got := (PR{Repo: in}).RepoName(); got != want {
 			t.Errorf("RepoName(%q) = %q, want %q", in, got, want)

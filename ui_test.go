@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 func TestShortNeverExceedsFourColumns(t *testing.T) {
@@ -768,5 +769,38 @@ func TestFooterMentionsHelp(t *testing.T) {
 	}
 	if got := m.footer(layoutFor(50)); !strings.Contains(got, "?") {
 		t.Errorf("compact footer = %q", got)
+	}
+}
+
+// A style rendered inside another ends with a full reset, which strips the
+// outer colour from everything after it. The dim jump number did exactly that,
+// so the wide layout drew every row after its number in the default colour.
+func TestRowColourSurvivesTheJumpNumber(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	m := model{client: &Client{}, loaded: true, prs: []PR{{
+		Repo: "org/app", Number: 5, Mine: true, Title: "title",
+		ReviewDecision: "APPROVED", Unresolved: 1,
+	}}}
+	m.ensureSelection()
+
+	for _, width := range []int{50, 100} {
+		m.width = width
+		l := layoutFor(width)
+		for _, r := range m.rows(l, width) {
+			if r.kind != rowPR {
+				continue
+			}
+			line := m.render(r, width, l)
+			// The title is on every layout; whatever escape precedes it must
+			// be the row's colour, not a reset.
+			at := strings.Index(line, "title")
+			last := strings.LastIndex(line[:at], "\x1b[")
+			if last < 0 || strings.HasPrefix(line[last:], "\x1b[0m") {
+				t.Errorf("width %d: title is not coloured: %q", width, line)
+			}
+		}
 	}
 }

@@ -910,8 +910,13 @@ func (m model) render(r row, width int, l layout) string {
 		// No repo column: the group header above the row already says it, and
 		// spending fourteen columns to repeat it on every row is exactly what
 		// grouping is meant to save.
-		body = fmt.Sprintf("%s %s %s %s %-*s %-*s %4s",
-			dimStyle.Render(idx), state.Glyph, num, r.link,
+		// The number is dim rather than the row's colour, so it goes ahead of
+		// the row's style instead of inside it. A style nested in another ends
+		// with a full reset, which would strip the state colour from the rest
+		// of the row.
+		cursor += dimStyle.Render(idx) + " "
+		body = fmt.Sprintf("%s %s %s %-*s %-*s %4s",
+			state.Glyph, num, r.link,
 			title, truncate(p.Title, title),
 			stateWidth, state.Label,
 			short(p.Age()))

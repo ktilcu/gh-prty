@@ -9,33 +9,41 @@ your GitHub auth.
 Yours and your team's, each grouped by repo.
 
 ```
- PRTY                                             platform · 10 mine · 24 team
+ PRTY                                                       platform · 6 mine · 2 team
 
- MINE                                                          9 ready · 1 blocked
-  api                                                6 ready · 1 blocked
->  1 +  1367 Stop summary totals from breaking~  ready to merge      2h
-       1h idle · +146-7
-   2 x  1354 Record page count on artifact deliveries ci failed           3d
-  worker                                                             1 open
-   3 o   125 Write dates at the precision the record~ awaiting review      6d
+ MINE                                                              2 ready · 3 to resolve
+  worker                                                      1 ready · 1 to resolve
+   1 +   196   Pick up Debian security fixes in agen~ ready to merge       4h
+   2 c   191   Hold the agent to the schema's requir~ 5 unresolved         9d
+  api                                                    1 ready · 2 to resolve
+>  3 d  1563 ┌ Rename legacy raw_file attachments on~ draft                1d
+       3 of 3 · on #1562 · 2h idle · +88-14
+   4 *  1562 │ Rasterize outlined-text pages in uplo~ approved · 1 open    1d
+   5 +  1561 └ Separate document uploads from normal~ ready to merge       1d
+   6 *  1539   Create new records instead of amendments  approved · 1 open    8d
 
- TEAM                                                                  2 for you
-  api                                                           7 open
-   4 d  1208 let customers export reports as notes~  draft              58d ben
-  worker                                                          1 for you
-   5 !   127 Add a zoom tool to the extraction~  needs you          11h ana
+ TEAM                                                                           1 for you
+  worker                                                                   1 for you
+   7 !   127   Add a zoom tool to the extractio~ needs you           10d ana
+  api                                                                    1 open
+   8 d  1208   let customers export reports as adde~ draft              121d ben
 
-  jk select · enter open · y copy url · 1-9 jump · tab all · r refresh 4s ago · q quit
+  jk select · enter open · tab all · r refresh 4s ago · ? help · q quit
 ```
 
 | | |
 | --- | --- |
 | `!` | waiting on you — your review, or changes requested on yours |
 | `x` | CI failed |
-| `+` | approved; on your own PR that means ready to merge |
+| `*` | approved, with review threads still open (purple) |
+| `+` | approved with nothing left open; on your own PR that means ready to merge |
+| `c` | review threads open and no approval yet (yellow) |
 | `~` | checks still running |
 | `o` | awaiting review |
 | `d` | draft |
+| `┌│└` | a stack, tip on top |
+
+`?` shows this legend inside prty, each state in its own colour.
 
 **AGE** is how long the PR has been open, which is the number that ages badly.
 A PR sitting unreviewed for two weeks is exactly what a sidebar exists to
@@ -72,7 +80,12 @@ Then run `prty` in a pane and leave it there. It needs `gh` on PATH and logged i
 | `tab` | cycle all → mine → team |
 | `g` `G` | first, last |
 | `r` | force a refresh |
+| `?` | help: the legend and these keys; `?` or `esc` goes back |
 | `q` | quit |
+
+The footer lists only the keys you reach for most. The rest are in `?`, because
+a footer naming every key ran past 90 columns and got clipped, starting with the
+hint for where to find the others.
 
 ## Whose PRs count as the team's
 
@@ -118,14 +131,40 @@ Each row shows one thing: the first state that applies, in priority order.
 2. **draft**
 3. **changes requested**
 4. **ci failed**
-5. **approved** / **ready to merge**
-6. **checks running**
-7. **awaiting review**
+5. **approved · 2 open** — approved, with review threads still open
+6. **approved** / **ready to merge** — approved, with nothing left open
+7. **3 unresolved** — review threads open, no approval yet
+8. **checks running**
+9. **awaiting review**
 
 The order is a priority, not a classification. A PR can be draft and failing and
 unreviewed at once, and the first match is the one you would act on first.
 Approved-but-failing reports the failure, because the approval went stale the
-moment CI went red.
+moment CI went red. Open threads outrank running checks, because checks finish on
+their own and threads wait for you.
+
+## Review threads
+
+On your own PRs, prty counts the review threads nobody has resolved. That is
+what tells a clean approval from one that came with things to address: "ready to
+merge" means approved, green, and nothing left open, and an approval with
+threads still open is purple `approved · 2 open` instead. The count is in the
+label because how many are left is what says how close the PR is.
+
+An outdated thread still counts. The code moved under it, which usually means it
+was addressed, but the reviewer still sees it open until someone resolves it.
+The detail line says how many are outdated, and names anyone who approved with a
+written note, which has nothing to resolve but may still be worth reading.
+
+Threads are fetched for your own PRs only. GitHub cannot count unresolved threads
+in a query, so every thread comes back, and asking for them on all four searches
+would multiply the cost of a request that already earns the odd `502`.
+
+Repos that require no review leave GitHub's `reviewDecision` empty even after an
+approval, so where it is empty prty reads the latest reviews instead: any
+changes requested wins, then any approval. Where GitHub does give a decision it
+is kept, since a repo needing two approvals says `REVIEW_REQUIRED` after the
+first and means it.
 
 ## Grouping
 
@@ -155,12 +194,13 @@ Stacked PRs are drawn as one run, tip first, with a connector between the number
 and the title:
 
 ```
-  api                                                             4 ready
-   3 d  1567 ┌ Revoke user tokens when deactivating a user   draft        22h
-   4 d  1565 │ Honor customer user status on every login path    draft        23h
-   5 o  1507 │ Record which connection granted an access scope   awaiting r~  17d
-   6 o  1402 └ Accept logins from any connection             awaiting r~  52d
-   7 +  1539   Create new records instead of amendments             ready to m~   8d
+  api                                                    1 ready · 3 to resolve
+>  1 d  1567 ┌ Revoke user tokens when deactivat~ draft               23h
+       4 of 4 · on #1565 · 23h idle · +45-2
+   2 d  1565 │ Honor customer user status on every l~ draft               23h
+   3 o  1507 │ Record which connection granted an ac~ awaiting review     17d
+   4 o  1402 └ Accept logins from any connection  awaiting review     52d
+   5 *  1539   Create new records instead of amendments  approved · 1 open    8d
 ```
 
 A PR is stacked on another when its base branch is the other's head branch, in
@@ -186,16 +226,18 @@ Under 76 columns the table switches to a compact layout, which is what a sidebar
 of a few hundred pixels gets:
 
 ```
- PRTY                              <90d 10/24
+ PRTY                                         6/2
 
- MINE                                 9 ready
-  api                       6 ready
->  +  1367 Stop summary totals from~   2h
-       ready to merge · 1h idle · +146-7
-   +  1354 Record page count on artifact~   3d
-   +  1346 Teach the agent to write date~   6d
-  worker                          1 open
-   o   125 Write dates at the precision ~   6d
+ MINE                      2 ready · 3 to resolve
+  worker              1 ready · 1 to resolve
+   +   196   Pick up Debian security fixes i~   4h
+   c   191   Hold the agent to the schema's ~   9d
+  api            1 ready · 2 to resolve
+>  d  1563 ┌ Rename legacy raw_file attachme~   1d
+       draft · 3 of 3 · on #1562 · 2h idle
+   *  1562 │ Rasterize outlined-text pages i~   1d
+   +  1561 └ Separate document uploads from ~   1d
+   *  1539   Create new cases instead of add~   8d
 ```
 
 The state word and the author are what go — the glyph says what the word does.

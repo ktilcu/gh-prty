@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -649,5 +650,123 @@ func TestDetailMentionsOutdatedThreadsAndNotes(t *testing.T) {
 	if got := detailOf(PR{Mine: true}, layoutFor(100), 100); strings.Contains(got, "outdated") ||
 		strings.Contains(got, "note") {
 		t.Errorf("a PR with neither mentioned them: %q", got)
+	}
+}
+
+func press(m model, key string) (model, tea.Cmd) {
+	var msg tea.KeyMsg
+	switch key {
+	case "esc":
+		msg = tea.KeyMsg{Type: tea.KeyEsc}
+	default:
+		msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)}
+	}
+	next, cmd := m.Update(msg)
+	return next.(model), cmd
+}
+
+func quits(cmd tea.Cmd) bool {
+	if cmd == nil {
+		return false
+	}
+	_, ok := cmd().(tea.QuitMsg)
+	return ok
+}
+
+func TestHelpTogglesAndEscClosesBeforeQuitting(t *testing.T) {
+	m := model{client: &Client{}, loaded: true, width: 100}
+
+	m, _ = press(m, "?")
+	if !m.help {
+		t.Fatal("? did not open help")
+	}
+	m, _ = press(m, "?")
+	if m.help {
+		t.Fatal("? did not close help")
+	}
+
+	// esc is how most people leave a help screen, so there it must not quit.
+	m, _ = press(m, "?")
+	m, cmd := press(m, "esc")
+	if m.help || quits(cmd) {
+		t.Errorf("esc in help: help %v, quit %v; want closed and still running",
+			m.help, quits(cmd))
+	}
+	if _, cmd := press(m, "esc"); !quits(cmd) {
+		t.Error("esc on the list no longer quits")
+	}
+	m, _ = press(m, "?")
+	if _, cmd := press(m, "q"); !quits(cmd) {
+		t.Error("q in help did not quit")
+	}
+}
+
+// The list is hidden behind help, so moving the cursor there would move it
+// somewhere you cannot see.
+func TestHelpIgnoresListKeys(t *testing.T) {
+	m := model{client: &Client{}, loaded: true, width: 100, prs: []PR{
+		{Repo: "org/app", Number: 2, Mine: true},
+		{Repo: "org/app", Number: 1, Mine: true},
+	}}
+	m.ensureSelection()
+	before := m.selected
+
+	m, _ = press(m, "?")
+	for _, key := range []string{"j", "G", "2"} {
+		var cmd tea.Cmd
+		if m, cmd = press(m, key); cmd != nil {
+			t.Errorf("%s in help returned a command", key)
+		}
+	}
+	if m.selected != before {
+		t.Errorf("cursor moved behind help: %s -> %s", before, m.selected)
+	}
+}
+
+// Refreshing carries on behind help, and must not close it.
+func TestRefreshKeepsHelpOpen(t *testing.T) {
+	m := model{client: &Client{}, help: true, width: 100}
+	next, _ := m.Update(feedMsg{feed: Feed{PRs: []PR{{Repo: "org/app", Number: 1}}}})
+	if !next.(model).help {
+		t.Error("a refresh closed help")
+	}
+}
+
+// The help is the legend, so a state missing from it is a glyph nobody can
+// decode.
+func TestHelpListsEveryState(t *testing.T) {
+	view := model{client: &Client{}, help: true, width: 100}.View()
+	for _, s := range []State{stateNeedsYou, stateDraft, stateChanges, stateFailing,
+		stateApprovedOpen(2), stateReady, stateUnresolved(3), stateRunning,
+		stateWaiting} {
+		if !strings.Contains(view, s.Glyph+"  "+s.Label) {
+			t.Errorf("help is missing %q %q", s.Glyph, s.Label)
+		}
+	}
+	for _, want := range []string{"┌", "open in browser", "copy url"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("help is missing %q", want)
+		}
+	}
+}
+
+func TestHelpFitsItsWidth(t *testing.T) {
+	for _, width := range []int{30, 40, 50, 60, 76, 100, 140} {
+		m := model{client: &Client{}, help: true, width: width}
+		for _, line := range m.helpLines(width) {
+			if got := lipgloss.Width(line); got > width {
+				t.Errorf("width %d: help line is %d columns:\n%q", width, got, line)
+			}
+		}
+	}
+}
+
+func TestFooterMentionsHelp(t *testing.T) {
+	m := model{client: &Client{}}
+	if got := m.footer(layoutFor(100)); !strings.Contains(got, "? help") {
+		t.Errorf("wide footer = %q", got)
+	}
+	if got := m.footer(layoutFor(50)); !strings.Contains(got, "?") {
+		t.Errorf("compact footer = %q", got)
 	}
 }

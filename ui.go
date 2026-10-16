@@ -97,6 +97,9 @@ type model struct {
 	selected string
 	offset   int
 	scope    scope
+	// help swaps the list for the legend. It replaces the list rather than
+	// floating over it, because an overlay has nowhere to go in a sidebar.
+	help bool
 
 	// loaded separates "fetched, found nothing" from "has not fetched yet", so
 	// startup does not flash an empty state that is not true.
@@ -195,9 +198,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.message = ""
 
+	// Help hides the list, so list keys would move a cursor you cannot see.
+	// Everything but leaving is ignored, and esc leaves help before it leaves
+	// the program, since that is what esc means on a help screen.
+	if m.help {
+		switch msg.String() {
+		case "?", "esc":
+			m.help = false
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		}
+		return m, nil
+	}
+
 	switch key := msg.String(); key {
 	case "q", "ctrl+c", "esc":
 		return m, tea.Quit
+	case "?":
+		m.help = true
 	case "j", "down":
 		m.move(1)
 	case "k", "up":
@@ -706,8 +724,29 @@ func teamNote(prs []PR) string {
 
 func (m model) View() string {
 	width := m.renderWidth()
-	l := layoutFor(width)
 
+	var lines []string
+	if m.help {
+		lines = m.helpLines(width)
+		// The list scrolls to keep the cursor in view; help has no cursor, so
+		// a short pane keeps the top, where the states are.
+		if m.height > 0 && len(lines) > m.height {
+			lines = lines[:m.height]
+		}
+	} else {
+		lines = m.listLines(width)
+	}
+
+	// Clipping matters more than it looks: an overflowing line wraps, and one
+	// wrapped row would desynchronise every row under it.
+	for i, line := range lines {
+		lines[i] = lipgloss.NewStyle().MaxWidth(width).Render(line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m model) listLines(width int) []string {
+	l := layoutFor(width)
 	lines := []string{m.title(width, l), ""}
 
 	rows := m.rows(l, width)
@@ -724,13 +763,75 @@ func (m model) View() string {
 	} else if m.message != "" {
 		lines = append(lines, dimStyle.Render("  "+m.message))
 	}
+	return lines
+}
 
-	// Clipping matters more than it looks: an overflowing line wraps, and one
-	// wrapped row would desynchronise every row under it.
-	for i, line := range lines {
-		lines[i] = lipgloss.NewStyle().MaxWidth(width).Render(line)
+// helpStates is the legend, in the order State resolves them, so reading down
+// the list is reading how a row decides what to say.
+var helpStates = []struct {
+	state State
+	desc  string
+}{
+	{stateNeedsYou, "your review is requested"},
+	{stateDraft, ""},
+	{stateChanges, ""},
+	{stateFailing, ""},
+	{stateApprovedOpen(2), "approved, threads still open"},
+	{stateReady, "approved, nothing left"},
+	{stateUnresolved(3), "threads open, no approval yet"},
+	{stateRunning, ""},
+	{stateWaiting, ""},
+}
+
+var helpKeys = [][2]string{
+	{"j k", "move"},
+	{"enter o", "open in browser"},
+	{"y", "copy url"},
+	{"1-9", "select and open"},
+	{"tab", "all, mine, team"},
+	{"g G", "first, last"},
+	{"r", "refresh"},
+	{"?", "this help"},
+	{"q", "quit"},
+}
+
+// helpLines draws each state in its own colour, so the legend is also the key
+// to what the colours mean. Descriptions are the first thing a narrow pane
+// drops, the same rule the detail line follows.
+func (m model) helpLines(width int) []string {
+	lines := []string{
+		spread("", titleStyle.Render(" PRTY · help"), "? back", width),
+		"",
+		spread(" ", headerStyle.Render("STATES"), "first match wins", width),
 	}
-	return strings.Join(lines, "\n")
+	for _, h := range helpStates {
+		text := h.state.Glyph + "  " + h.state.Label
+		if h.desc != "" && 2+3+stateWidth+2+len(h.desc) <= width {
+			text = fmt.Sprintf("%s  %-*s  %s", h.state.Glyph, stateWidth, h.state.Label,
+				dimStyle.Render(h.desc))
+		}
+		lines = append(lines, "  "+styleFor(h.state.kind).Render(text))
+	}
+
+	lines = append(lines, "", " "+headerStyle.Render("STACKS"),
+		"  ┌│└  "+dimStyle.Render(fit([]string{"tip on top", "detail says 2 of 4"},
+			" · ", width-7)))
+
+	lines = append(lines, "", " "+headerStyle.Render("KEYS"))
+	const keyWidth, descWidth = 9, 17
+	perLine := 1
+	if width >= 2*(2+keyWidth+descWidth) {
+		perLine = 2
+	}
+	for keys := range slices.Chunk(helpKeys, perLine) {
+		line := ""
+		for _, k := range keys {
+			desc := truncate(k[1], min(descWidth, width-2-keyWidth))
+			line += fmt.Sprintf("  %-*s%-*s", keyWidth, k[0], descWidth, desc)
+		}
+		lines = append(lines, dimStyle.Render(strings.TrimRight(line, " ")))
+	}
+	return lines
 }
 
 func (m model) title(width int, l layout) string {
@@ -839,10 +940,13 @@ func (m model) footer(l layout) string {
 	}
 
 	if l.compact {
-		return dimStyle.Render("  jk  enter  y  tab  r " + age + "  q")
+		return dimStyle.Render("  jk  enter  y  tab  r " + age + "  ?  q")
 	}
-	return dimStyle.Render("  jk select · enter open · y copy url · 1-9 jump · tab " +
-		m.scope.String() + " · r refresh " + age + " · q quit")
+	// The rest of the keys live in help. A footer listing all of them ran past
+	// 90 columns and got clipped, and the first thing clipped was the hint for
+	// where to find the rest.
+	return dimStyle.Render("  jk select · enter open · tab " + m.scope.String() +
+		" · r refresh " + age + " · ? help · q quit")
 }
 
 // --- formatting -------------------------------------------------------------

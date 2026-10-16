@@ -29,7 +29,16 @@ func main() {
 	once := flag.Bool("once", false, "print a single frame and exit")
 	width := flag.Int("width", 0, "render --once at this width, for previewing "+
 		"narrow layouts")
+	themeName := flag.String("theme", "default", "colour scheme: default or "+
+		"tokyonight-moon")
 	flag.Parse()
+
+	t, err := lookupTheme(*themeName)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "prty:", err)
+		os.Exit(1)
+	}
+	useTheme(t)
 
 	client := &Client{Org: *org, Limit: *limit, MaxAge: *maxAge}
 	if *team != "" {

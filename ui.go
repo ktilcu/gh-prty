@@ -12,25 +12,14 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// The styles are set from a theme by useTheme; see theme.go.
 var (
-	titleStyle  = lipgloss.NewStyle().Bold(true)
-	dimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	cursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
-	errorStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
-	headerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Bold(true)
-	// Repo groups sit visually between a section header and a row, so they get
-	// the header's hue without its weight.
-	groupStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("74"))
+	titleStyle = lipgloss.NewStyle().Bold(true)
 
-	neutralStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	goodStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	runningStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
-	actStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true)
-	brokenStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
-	// Approved with open threads is good news with a little left to do, so it
-	// gets a colour of its own rather than a shade of ready or blocked.
-	approvedOpenStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
-	unresolvedStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
+	dimStyle, cursorStyle, errorStyle, headerStyle, groupStyle lipgloss.Style
+
+	neutralStyle, goodStyle, runningStyle, actStyle, brokenStyle lipgloss.Style
+	approvedOpenStyle, unresolvedStyle                           lipgloss.Style
 )
 
 func styleFor(k stateKind) lipgloss.Style {

@@ -1,4 +1,4 @@
-module github.com/ktilcu/prty
+module github.com/ktilcu/gh-prty
 
 go 1.26.6
 

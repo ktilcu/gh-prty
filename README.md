@@ -9,24 +9,24 @@ your GitHub auth.
 Yours and your team's, each grouped by repo.
 
 ```
- PRTY                                                       platform · 6 mine · 2 team
+ PRTY                                                          platform · 6 mine · 2 team
 
  MINE                                                              2 ready · 3 to resolve
-  worker                                                      1 ready · 1 to resolve
-   1 +   196   Pick up Debian security fixes in agen~ ready to merge       4h
-   2 c   191   Hold the agent to the schema's requir~ 5 unresolved         9d
-  api                                                    1 ready · 2 to resolve
->  3 d  1563 ┌ Rename legacy raw_file attachments on~ draft                1d
+  worker                                                           1 ready · 1 to resolve
+   1 +   196   Pin the base image to pick up securit~ ready to merge       4h
+   2 c   191   Validate required fields in agent out~ 5 unresolved         9d
+  api                                                              1 ready · 2 to resolve
+>  3 d  1563 ┌ Rename the legacy attachment columns   draft                1d
        3 of 3 · on #1562 · 2h idle · +88-14
-   4 *  1562 │ Rasterize outlined-text pages in uplo~ approved · 1 open    1d
-   5 +  1561 └ Separate document uploads from normal~ ready to merge       1d
-   6 *  1539   Create new records instead of amendments  approved · 1 open    8d
+   4 *  1562 │ Rasterize scanned pages in uploaded P~ approved · 1 open    1d
+   5 +  1561 └ Store originals apart from normalized~ ready to merge       1d
+   6 *  1539   Create new records instead of amendme~ approved · 1 open    8d
 
  TEAM                                                                           1 for you
-  worker                                                                   1 for you
-   7 !   127   Add a zoom tool to the extractio~ needs you           10d ana
-  api                                                                    1 open
-   8 d  1208   let customers export reports as adde~ draft              121d ben
+  worker                                                                        1 for you
+   7 !   127   Add a zoom tool to the extraction age~ needs you           10d ana
+  api                                                                              1 open
+   8 d  1208   Let customers export reports as CSV    draft              121d ben
 
   jk select · enter open · tab all · r refresh 4s ago · ? help · q quit
 ```
@@ -51,12 +51,38 @@ surface.
 
 ## Install
 
+prty is a `gh` extension. It needs `gh` anyway, for your GitHub auth, so `gh` is
+also what installs and updates it:
+
 ```sh
-go install github.com/ktilcu/prty@latest
+gh extension install ktilcu/gh-prty
+gh prty
 ```
 
-Then run `prty` in a pane and leave it there. It needs `gh` on PATH and logged in
-(`gh auth status`), with the `read:org` scope so it can resolve your team.
+Then leave it running in a pane. `gh` must be logged in (`gh auth status`) with
+the `read:org` scope so prty can resolve your team. Each release ships prebuilt
+binaries, so there is no Go toolchain to install.
+
+```sh
+gh extension upgrade prty   # or: gh extension upgrade --all
+```
+
+The rest of this README calls it `prty`; `alias prty='gh prty'` makes that
+literal.
+
+### Releasing
+
+Push a version tag and a GitHub Action builds every platform and publishes the
+release that `gh extension install` reads from:
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+### Working on it
+
+From a clone, `gh extension install .` links the checkout in place of the
+release, so `go build` and `gh prty` run your changes.
 
 | flag | |
 | --- | --- |
@@ -200,13 +226,13 @@ Stacked PRs are drawn as one run, tip first, with a connector between the number
 and the title:
 
 ```
-  api                                                    1 ready · 3 to resolve
->  1 d  1567 ┌ Revoke user tokens when deactivat~ draft               23h
+  api                                                                        1 to resolve
+>  1 d  1567 ┌ Revoke tokens when deactivating a user draft               23h
        4 of 4 · on #1565 · 23h idle · +45-2
-   2 d  1565 │ Honor customer user status on every l~ draft               23h
-   3 o  1507 │ Record which connection granted an ac~ awaiting review     17d
-   4 o  1402 └ Accept logins from any connection  awaiting review     52d
-   5 *  1539   Create new records instead of amendments  approved · 1 open    8d
+   2 d  1565 │ Check user status on every login path  draft                1d
+   3 o  1507 │ Record which connection granted a sco~ awaiting review     17d
+   4 o  1402 └ Accept logins from any identity provi~ awaiting review     52d
+   5 *  1539   Create new records instead of amendme~ approved · 1 open    8d
 ```
 
 A PR is stacked on another when its base branch is the other's head branch, in
@@ -235,15 +261,15 @@ of a few hundred pixels gets:
  PRTY                                         6/2
 
  MINE                      2 ready · 3 to resolve
-  worker              1 ready · 1 to resolve
-   +   196   Pick up Debian security fixes i~   4h
-   c   191   Hold the agent to the schema's ~   9d
-  api            1 ready · 2 to resolve
->  d  1563 ┌ Rename legacy raw_file attachme~   1d
+  worker                   1 ready · 1 to resolve
+   +   196   Pin the base image to pick up s~   4h
+   c   191   Validate required fields in age~   9d
+  api                      1 ready · 2 to resolve
+>  d  1563 ┌ Rename the legacy attachment co~   1d
        draft · 3 of 3 · on #1562 · 2h idle
-   *  1562 │ Rasterize outlined-text pages i~   1d
-   +  1561 └ Separate document uploads from ~   1d
-   *  1539   Create new cases instead of add~   8d
+   *  1562 │ Rasterize scanned pages in uplo~   1d
+   +  1561 └ Store originals apart from norm~   1d
+   *  1539   Create new records instead of a~   8d
 ```
 
 The state word and the author are what go — the glyph says what the word does.
@@ -301,5 +327,5 @@ terminal.
 
 ## Requirements
 
-Go 1.24+ to build, and `gh` logged in. `enter` uses `open` and `y` uses `pbcopy`,
-so those two keys are macOS-only; everything else is portable.
+Go 1.26+ to build from source, and `gh` logged in. `enter` uses `open` and `y`
+uses `pbcopy`, so those two keys are macOS-only; everything else is portable.

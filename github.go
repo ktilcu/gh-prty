@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"slices"
 	"strconv"
@@ -472,6 +473,10 @@ func gh(args ...string) ([]byte, error) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "gh", args...)
+	// gh's output is parsed, never shown, so colour is only ever a corruption.
+	// CLICOLOR_FORCE in the user's environment would otherwise put escape codes
+	// into the JSON. The later entry wins when exec builds the environment.
+	cmd.Env = append(os.Environ(), "CLICOLOR_FORCE=0")
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 
